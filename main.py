@@ -21,12 +21,14 @@ def run_bot():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(button_handler))
     
-    if os.getenv('PELLA_MODE'):
-        # Режим для Pella (webhook)
+    # Режим для Pella (webhook)
+    if os.getenv('PELLA_MODE', 'false').lower() == 'true':
+        port = int(os.getenv('PORT', 8080))
         app.run_webhook(
             listen="0.0.0.0",
-            port=int(os.getenv('PORT', 8080)),
-            webhook_url=os.getenv('WEBHOOK_URL')
+            port=port,
+            webhook_url=os.getenv('WEBHOOK_URL'),
+            secret_token='YOUR_SECRET_TOKEN'
         )
     else:
         # Локальный режим (polling)
