@@ -3,8 +3,8 @@ name: Run Telegram Bot
 on:
   workflow_dispatch:  # Позволяет запускать вручную g
   schedule:
-   # - cron: '*/5 * * * *'  # Запускать каждые 5 минут
-
+    - cron: '*/5 * * * *'  # Запускать каждые 5 минут
+    
 jobs:
   deploy:
     runs-on: ubuntu-latest
