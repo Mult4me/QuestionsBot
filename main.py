@@ -8,10 +8,9 @@ from qa_data import QA_DATABASE
 load_dotenv()
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
-user_context = {}  # Хранение выбранной категории для каждого пользователя
+user_context = {}  # Хранит: {user_id: {category, index, show_answer}}
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.bot_data.clear()  # Сброс хранилища соответствий ID -> вопрос
     keyboard = [[InlineKeyboardButton(cat, callback_data=f"cat:{cat}")]
                 for cat in QA_DATABASE.keys()]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -20,31 +19,63 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+    user_id = query.from_user.id
     data = query.data
 
     if data.startswith("cat:"):
         category = data[4:]
-        user_context[query.from_user.id] = category
-        keyboard = []
-        for question in QA_DATABASE[category].keys():
-            q_id = hashlib.sha1(question.encode()).hexdigest()[:16]
-            context.bot_data[q_id] = question
-            keyboard.append([InlineKeyboardButton(question[:50], callback_data=f"q:{q_id}")])
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text("Выберите вопрос:", reply_markup=reply_markup)
+        user_context[user_id] = {"category": category, "index": 0, "show_answer": False}
+        await show_question(query, user_id)
+        return
 
-    elif data.startswith("q:"):
-        q_id = data[2:]
-        question = context.bot_data.get(q_id)
-        if not question:
-            await query.edit_message_text("Вопрос не найден.")
-            return
-        category = user_context.get(query.from_user.id, "Все вопросы")
-        answer = QA_DATABASE.get(category, {}).get(question) or next(
-            (v for cat in QA_DATABASE.values() for k, v in cat.items() if k == question),
-            "Ответ не найден."
-        )
-        await query.edit_message_text(f"<b>{question}</b>\n\n{answer}", parse_mode="HTML")
+    if user_id not in user_context:
+        await query.edit_message_text("Сначала выберите категорию. /start")
+        return
+
+    action = data
+    if action == "next":
+        user_context[user_id]["index"] += 1
+        user_context[user_id]["show_answer"] = False
+    elif action == "prev":
+        user_context[user_id]["index"] = max(0, user_context[user_id]["index"] - 1)
+        user_context[user_id]["show_answer"] = False
+    elif action == "show_answer":
+        user_context[user_id]["show_answer"] = True
+    elif action == "back_to_cat":
+        await start(query, context)
+        return
+
+    await show_question(query, user_id)
+
+async def show_question(query, user_id):
+    context_data = user_context[user_id]
+    category = context_data["category"]
+    index = context_data["index"]
+    show_answer = context_data["show_answer"]
+
+    questions = list(QA_DATABASE[category].items())
+    total = len(questions)
+
+    if index >= total:
+        index = total - 1
+        user_context[user_id]["index"] = index
+
+    question, answer = questions[index]
+    text = f"<b>{question}</b>"
+    if show_answer:
+        text += f"\n\n{answer}"
+
+    keyboard = [
+        [
+            InlineKeyboardButton("⬅️ Предыдущий", callback_data="prev"),
+            InlineKeyboardButton("Показать ответ" if not show_answer else "Ответ показан", callback_data="show_answer"),
+            InlineKeyboardButton("Следующий ➡️", callback_data="next")
+        ],
+        [InlineKeyboardButton("🔙 Назад к категориям", callback_data="back_to_cat")]
+    ]
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode="HTML")
 
 def run_bot():
     app = Application.builder().token(TOKEN).build()
