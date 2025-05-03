@@ -2,15 +2,11 @@ import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 from dotenv import load_dotenv
+from qa_data import QA_DATABASE  # импорт из нового файла
 
-load_dotenv()  # Загрузка переменных из .env
+load_dotenv()
 
-TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')  # исправлено имя переменной
-
-QA_DATABASE = {
-    "Что такое Telegram?": "Telegram — это мессенджер с поддержкой ботов.",
-    "Кто создал Telegram?": "Telegram был создан Павлом Дуровым."
-}
+TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
